@@ -1,10 +1,28 @@
 {
   "dependencies": {
+    "express": "^5.1.0",
+    "json2csv": "^6.0.0-alpha.2",
     "puppeteer": "^24.17.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "node jd-rpa.js"
-  }
+  },
+  "name": "jd-rpa",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jd-rpa.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CyXiaoFeng/jd-rpa.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/CyXiaoFeng/jd-rpa/issues"
+  },
+  "homepage": "https://github.com/CyXiaoFeng/jd-rpa#readme"
 }

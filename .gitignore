@@ -1,0 +1,55 @@
+node_modules/
+*.lock
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs
+logs
+*.log
+*.log.*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.cache/
+.tmp/
+temp/
+tmp/
+
+# Puppeteer / Chrome
+.chromium/
+.local-chromium/
+puppeteer*
+/chrome-profile/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor configs
+.vscode/
+.idea/
+*.swp
+
+# Custom app data
+jd_cookies.json
+results.xlsx
+*.lock

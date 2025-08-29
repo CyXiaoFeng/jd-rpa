@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>京东抓取工具</title>
+</head>
+<body>
+  <h1>京东抓取工具</h1>
+  <input id="keyword" type="text" placeholder="输入关键词">
+  <button id="searchBtn">开始抓取</button>
+  <pre id="output"></pre>
+
+  <script>
+    document.getElementById('searchBtn').onclick = async () => {
+      const keyword = document.getElementById('keyword').value;
+      if (!keyword) {
+        alert("请输入关键词");
+        return;
+      }
+
+      document.getElementById('output').textContent = "正在抓取...";
+
+      try {
+        const resp = await fetch('/search', {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword })
+        });
+
+        if (!resp.ok) {
+          throw new Error("请求失败: " + resp.status);
+        }
+
+        const data = await resp.json();
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('output').textContent = "❌ 抓取失败: " + err.message;
+      }
+    };
+  </script>
+</body>
+</html>

@@ -188,16 +188,8 @@ async function getResults(page, results) {
     }
 }
 
-// 主入口
-(async () => {
-    const { browser, page } = await launchBrowser();
-    try {
-        await loginJD(page);
-        await searchJD(page, "正大叶黄素鸡蛋");
-        console.log("抓取完成 ✅");
-    } catch (err) {
-        console.error("运行出错:", err);
-    } finally {
-        // await browser.close();
-    }
-})();
+module.exports = {
+    launchBrowser,
+    loginJD,
+    getResults
+};
