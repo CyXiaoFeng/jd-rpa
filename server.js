@@ -3,7 +3,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 
 // 引入你的 JD 抓取器（保持你现有的版本即可）
-const jd = require('./jd-scraper');
+const jd = require('./jd-scraper').default;
 // 引入刚新增的淘宝抓取器
 const tb = require('./taobao-scraper');
 
@@ -28,27 +28,19 @@ app.post('/search', async (req, res) => {
         if (site === 'jd') {
             const { browser, page } = await jd.launchBrowser();
             await jd.loginJD(page);
-            // 在 JD 中用首页输入搜索是你现有逻辑；也可以像淘宝那样构造搜索 URL
-            await page.type('#key', keyword);
-            await page.evaluate(() => document.querySelector('.button').click());
-
-            await jd.getResults(page, results);  // 你之前的递归抓取
+            await jd.searchJD(page, keyword, results);
             latestResults = results.map(r => ({ site: 'jd', ...r }));
             //   await browser.close();
 
         } else if (site === 'taobao') {
             const { browser, page } = await tb.launchBrowser();
             await tb.loginTaobao(page); // 可根据需要注释掉，但强烈建议登录
-            // 直接打开搜索页（比在首页输入更稳定）
-            const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
-            await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
-            results = await tb.searchTaobaoAndCollect(page);
+            await tb.searchTB(page, keyword, results);
             latestResults = results.map(r => ({ site: 'taobao', ...r }));
             //   await browser.close();
         } else {
             return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         }
-
         console.log(`✅ 抓取完成：${latestResults.length} 条`);
         res.json(latestResults);
     } catch (e) {

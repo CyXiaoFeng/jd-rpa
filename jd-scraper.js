@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
-
 puppeteer.use(StealthPlugin());
 
 const COOKIES_FILE = 'jd_cookies.json';
@@ -97,19 +96,24 @@ async function getProductInfo(selector, page) {
         return await page.evaluate((sel) => {
             const container = document.querySelector(sel);
             if (!container) return [];
-
-            const getText = (el, query, def = '') => {
-                const node = el.querySelector(query);
-                return node ? node.innerText.replace(/\n/g, '').trim() : def;
-            };
-
             // 判断是 ul 还是 div 容器
+            // const getValue = (el, query, { type = 'text', attr = 'href', def = '' } = {}) =>{
+            //     const node = el.querySelector(query);
+            //     if (!node) return def;
+
+            //     if (type === 'text') {
+            //         return node.innerText.replace(/\n/g, '').trim();
+            //     } else if (type === 'attr') {
+            //         return node.getAttribute(attr) || def;
+            //     }
+            //     return def;
+            // };
             const items = sel === '#J_goodsList > ul' ? container.querySelectorAll('li') : container.children;
             return Array.from(items).map(el => ({
-                shop: getText(el, '[class*="shop"]', '未知店铺'),
-                product: getText(el, '[class*="name"], div._goods_title_container_1x4i2_1 span', '未知商品'),
-                price: getText(el, '[class*="price"], div._container_1tn4o_1 span', '未知价格'),
-                sold: getText(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', '已售0')
+                shop: getValue(el, '[class*="shop"]', { type: 'text', def: '未知店铺' }),
+                product: getValue(el, '[class*="name"], div._goods_title_container_1x4i2_1 span', { type: 'text', def: '未知商品' }),
+                price: getValue(el, '[class*="price"], div._container_1tn4o_1 span', { type: 'text', def: '未知价格' }),
+                sold: getValue(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', { type: 'text', def: '已售0' })
             }));
         }, selector);
     } catch (error) {
@@ -119,18 +123,15 @@ async function getProductInfo(selector, page) {
 }
 
 // 搜索关键词
-async function searchJD(page, keyword) {
+async function searchJD(page, keyword, results) {
     console.log(`🔍 搜索: ${keyword}`);
     await page.type('#key', keyword);
     await page.evaluate(() => document.querySelector('.button').click());
     console.log('点击搜索按钮');
-
-    const results = [];
+    await page.addScriptTag({ path: "./public.js" });
     await getResults(page, results);
     console.log(`✅ 共抓取 ${results.length} 条结果`);
-    console.table(results);
 
-    return results;
 }
 
 /**
@@ -173,13 +174,13 @@ async function getResults(page, results) {
         const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page);
         if (hasNext && !isDisabled && nextBtn) {
             console.log('找到下一页按钮，是否禁用:', isDisabled);
-                await Promise.all([
-                    nextBtn.click(),
-                    // page.waitForNavigation({ waitUntil: 'networkidle2' })
-                ]);
-                console.log('➡️ 已点击下一页');
-                await getResults(page, results);
-           
+            await Promise.all([
+                nextBtn.click(),
+                // page.waitForNavigation({ waitUntil: 'networkidle2' })
+            ]);
+            console.log('➡️ 已点击下一页');
+            await getResults(page, results);
+
         } else {
             console.log('没有找到下一页按钮或已禁用，结束抓取。');
         }
@@ -189,7 +190,7 @@ async function getResults(page, results) {
 }
 
 module.exports = {
+    searchJD,
     launchBrowser,
-    loginJD,
-    getResults
+    loginJD
 };
