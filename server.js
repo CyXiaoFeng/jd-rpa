@@ -3,7 +3,7 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 
 // 引入你的 JD 抓取器（保持你现有的版本即可）
-const jd = require('./jd-scraper').default;
+const jd = require('./jd-scraper');
 // 引入刚新增的淘宝抓取器
 const tb = require('./taobao-scraper');
 

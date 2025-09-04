@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
+
 puppeteer.use(StealthPlugin());
 
 const COOKIES_FILE = 'jd_cookies.json';
@@ -31,12 +32,21 @@ async function waitForProductContainer(page) {
 // 启动浏览器
 async function launchBrowser() {
     const browser = await puppeteer.launch({
-        headless: false,
-        defaultViewport: null,
-        args: ['--start-maximized']
-    });
-    const page = await browser.newPage();
-    return { browser, page };
+            headless: false,
+            defaultViewport: null,
+            args: ['--start-maximized']
+        });
+        const page = await browser.newPage();
+    
+        // 常见头部伪装
+        await page.setUserAgent(
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+        );
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'zh-CN,zh;q=0.9'
+        });
+    
+        return { browser, page };
 }
 
 // 登录京东
@@ -93,27 +103,21 @@ async function autoScroll(page) {
 // 获取商品信息
 async function getProductInfo(selector, page) {
     try {
+         const hasFunc = await page.evaluate(() => typeof getValue === 'function');
+         if(!hasFunc)
+            await page.addScriptTag({path: "public.js"});
         return await page.evaluate((sel) => {
+            console.log('当前 evaluate 执行在 frame:', window.location.href);
             const container = document.querySelector(sel);
             if (!container) return [];
             // 判断是 ul 还是 div 容器
-            // const getValue = (el, query, { type = 'text', attr = 'href', def = '' } = {}) =>{
-            //     const node = el.querySelector(query);
-            //     if (!node) return def;
-
-            //     if (type === 'text') {
-            //         return node.innerText.replace(/\n/g, '').trim();
-            //     } else if (type === 'attr') {
-            //         return node.getAttribute(attr) || def;
-            //     }
-            //     return def;
-            // };
             const items = sel === '#J_goodsList > ul' ? container.querySelectorAll('li') : container.children;
             return Array.from(items).map(el => ({
                 shop: getValue(el, '[class*="shop"]', { type: 'text', def: '未知店铺' }),
-                product: getValue(el, '[class*="name"], div._goods_title_container_1x4i2_1 span', { type: 'text', def: '未知商品' }),
+                product: getValue(el, '[class*="name"], div._goods_title_container_1x4i2_1 span',  { type: 'text', def: '未知商品' }),
                 price: getValue(el, '[class*="price"], div._container_1tn4o_1 span', { type: 'text', def: '未知价格' }),
-                sold: getValue(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', { type: 'text', def: '已售0' })
+                sold: getValue(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', { type: 'text', def: '已售0' }),
+                link: getValue(el, 'a[href*="//item.jd.com"]', { type: 'attr', attr: 'href', def: '未知链接' }),
             }));
         }, selector);
     } catch (error) {
@@ -128,10 +132,12 @@ async function searchJD(page, keyword, results) {
     await page.type('#key', keyword);
     await page.evaluate(() => document.querySelector('.button').click());
     console.log('点击搜索按钮');
-    await page.addScriptTag({ path: "./public.js" });
+    // console.log('当前页面 frames 数量:', page.frames().length);
+    // page.frames().forEach(f => console.log(f.url(), f.name()));
     await getResults(page, results);
     console.log(`✅ 共抓取 ${results.length} 条结果`);
-
+    // console.table(results);
+    return results;
 }
 
 /**
@@ -165,22 +171,24 @@ async function checkNextButton(page) {
 // 递归抓取每一页
 async function getResults(page, results) {
     try {
+       
         const { selector } = await waitForProductContainer(page);
         console.log(`当前使用 selector: ${selector}`);
         await autoScroll(page);
+         
         const productInfo = await getProductInfo(selector, page);
         console.log(`本页抓取 ${productInfo.length} 条`);
         results.push(...productInfo);
         const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page);
         if (hasNext && !isDisabled && nextBtn) {
             console.log('找到下一页按钮，是否禁用:', isDisabled);
-            await Promise.all([
-                nextBtn.click(),
-                // page.waitForNavigation({ waitUntil: 'networkidle2' })
-            ]);
-            console.log('➡️ 已点击下一页');
-            await getResults(page, results);
-
+                await Promise.all([
+                    nextBtn.click(),
+                    // page.waitForNavigation({ waitUntil: 'networkidle2' })
+                ]);
+                console.log('➡️ 已点击下一页');
+                await getResults(page, results);
+           
         } else {
             console.log('没有找到下一页按钮或已禁用，结束抓取。');
         }
