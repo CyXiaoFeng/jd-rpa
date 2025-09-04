@@ -1,41 +1,99 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <title>京东抓取工具</title>
+  <meta charset="UTF-8" />
+  <title>电商抓取工具（JD / 淘宝）</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; max-width: 900px; margin: 40px auto; }
+    .row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+    input, select, button { padding: 8px 10px; font-size: 14px; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #fafafa; }
+    .status { margin-top: 8px; color: #666; }
+  </style>
 </head>
 <body>
-  <h1>京东抓取工具</h1>
-  <input id="keyword" type="text" placeholder="输入关键词">
-  <button id="searchBtn">开始抓取</button>
-  <pre id="output"></pre>
+  <h1>电商抓取工具</h1>
+
+  <div class="row">
+    <label for="site">站点：</label>
+    <select id="site">
+      <option value="jd">京东</option>
+      <option value="taobao">淘宝</option>
+    </select>
+
+    <input id="keyword" type="text" placeholder="输入关键词，例如：手机壳 / 叶黄素鸡蛋" style="flex:1" />
+    <button id="searchBtn">开始抓取</button>
+    <button id="exportBtn">导出 Excel</button>
+  </div>
+
+  <div class="status" id="status">状态：就绪</div>
+
+  <table id="resultTable" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>站点</th>
+        <th>店铺</th>
+        <th>商品</th>
+        <th>价格</th>
+        <th>销量</th>
+        <th>链接</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
   <script>
-    document.getElementById('searchBtn').onclick = async () => {
-      const keyword = document.getElementById('keyword').value;
-      if (!keyword) {
-        alert("请输入关键词");
-        return;
-      }
+    const statusEl = document.getElementById('status');
+    const table = document.getElementById('resultTable');
+    const tbody = table.querySelector('tbody');
 
-      document.getElementById('output').textContent = "正在抓取...";
+    function renderTable(rows) {
+      tbody.innerHTML = '';
+      rows.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${r.site || ''}</td>
+          <td>${r.shop || ''}</td>
+          <td>${r.product || ''}</td>
+          <td>${r.price || ''}</td>
+          <td>${r.sold || ''}</td>
+          <td>${r.link ? `<a href="${r.link}" target="_blank">链接</a>` : ''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      table.style.display = rows.length ? 'table' : 'none';
+    }
+
+    document.getElementById('searchBtn').onclick = async () => {
+      const keyword = document.getElementById('keyword').value.trim();
+      const site = document.getElementById('site').value;
+      if (!keyword) return alert('请输入关键词');
+
+      renderTable([]);
+      statusEl.textContent = '状态：抓取中...（会自动打开浏览器并可能需要登录）';
 
       try {
         const resp = await fetch('/search', {
           method: 'POST',
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keyword })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword, site })
         });
-
-        if (!resp.ok) {
-          throw new Error("请求失败: " + resp.status);
-        }
-
+        if (!resp.ok) throw new Error('请求失败 ' + resp.status);
         const data = await resp.json();
-        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        document.getElementById('output').textContent = "❌ 抓取失败: " + err.message;
+        statusEl.textContent = `状态：抓取完成，共 ${data.length} 条`;
+        renderTable(data);
+      } catch (e) {
+        statusEl.textContent = '状态：抓取失败 - ' + e.message;
       }
+    };
+
+    document.getElementById('exportBtn').onclick = () => {
+      window.location.href = '/export';
     };
   </script>
 </body>
