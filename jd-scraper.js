@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const checkNextButton = require('./public').checkNextButton;
 const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
@@ -12,10 +13,7 @@ const PRODUCT_CONTAINER_SELECTORS = [
     '#searchCenter .plugin_goodsContainer'
 ];
 // 翻页按钮选择器
-const NEXT_PAGE_SELECTORS = [
-    '.pn-next',
-    '#searchCenter > div > div > div._wrapper_f6icl_11 > div._pagiContainer_f6icl_16 > div > div._pagination_next_1jczn_8'
-];
+const NEXT_PAGE_SELECTORS = '#searchCenter [class*="pagination_next"], #searchCenter .pn-next';
 
 // 等待商品容器出现
 async function waitForProductContainer(page) {
@@ -140,33 +138,6 @@ async function searchJD(page, keyword, results) {
     return results;
 }
 
-/**
- * 检查下一页按钮状态
- * @param {puppeteer.Page} page 
- * @returns {Promise<{hasNext: boolean, isDisabled: boolean, element: puppeteer.ElementHandle|null}>}
- */
-async function checkNextButton(page) {
-    // 支持兼容选择器
-    const nextBtnSelector = '#searchCenter [class*="pagination_next"], #searchCenter .pn-next';
-    const nextBtn = await page.$(nextBtnSelector);
-
-    if (!nextBtn) {
-        return { hasNext: false, isDisabled: true, element: null };
-    }
-
-    // 判断按钮是否禁用，兼容 classList.contains 和 className.includes
-    const isDisabled = await nextBtn.evaluate(btn => {
-        if (btn.classList && btn.classList.contains('disabled')) return true;
-        if (btn.className && btn.className.includes('disabled')) return true;
-        return false;
-    });
-
-    return {
-        hasNext: true,
-        isDisabled,
-        element: nextBtn
-    };
-}
 
 // 递归抓取每一页
 async function getResults(page, results) {
@@ -175,16 +146,14 @@ async function getResults(page, results) {
         const { selector } = await waitForProductContainer(page);
         console.log(`当前使用 selector: ${selector}`);
         await autoScroll(page);
-         
         const productInfo = await getProductInfo(selector, page);
         console.log(`本页抓取 ${productInfo.length} 条`);
         results.push(...productInfo);
-        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page);
+        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
         if (hasNext && !isDisabled && nextBtn) {
             console.log('找到下一页按钮，是否禁用:', isDisabled);
                 await Promise.all([
                     nextBtn.click(),
-                    // page.waitForNavigation({ waitUntil: 'networkidle2' })
                 ]);
                 console.log('➡️ 已点击下一页');
                 await getResults(page, results);
