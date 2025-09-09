@@ -12,7 +12,7 @@ function getValue(el, query, { type = 'text', attr = 'href', def = '' } = {}) {
 
 async function checkNextButton(page, selector) {
     // 支持兼容选择器
-    // const nextBtnSelector = '#searchCenter [class*="pagination_next"], #searchCenter .pn-next, button.next-next';
+
     const nextBtn = await page.$(selector);
 
     if (!nextBtn) {

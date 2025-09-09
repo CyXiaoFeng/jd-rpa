@@ -21,11 +21,14 @@
     <label for="site">站点：</label>
     <select id="site">
       <option value="jd">京东</option>
+      <option value="jdstream">京东流</option>
       <option value="taobao">淘宝</option>
+      <option value="taobaostream">淘宝流</option>
     </select>
 
     <input id="keyword" type="text" placeholder="输入关键词，例如：手机壳 / 叶黄素鸡蛋" style="flex:1" />
     <button id="searchBtn">开始抓取</button>
+    <button id="searchBtnStream">开始抓取流</button>
     <button id="exportBtn">导出 Excel</button>
   </div>
 
@@ -91,6 +94,43 @@
         statusEl.textContent = '状态：抓取失败 - ' + e.message;
       }
     };
+
+    document.getElementById('searchBtnStream').onclick = async () => {
+        const keyword = document.getElementById('keyword').value.trim();
+        const site = document.getElementById('site').value;
+        if (!keyword) return alert('请输入关键词');
+        const decoder = new TextDecoder("utf-8");
+        renderTable([]);
+        statusEl.textContent = '状态：抓取中...（会自动打开浏览器并可能需要登录）';
+
+        try {
+          const resp = await fetch('/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword, site })
+          }).then((response) => {
+            const reader = response.body
+            .pipeThrough(new TextDecoderStream())
+            .getReader();
+            // read() returns a promise that resolves when a value has been received
+            reader.read().then(function pump({ done, value }) {
+              console.log(`is done? ${done}`);
+              if(done) {
+                console.log('Stream complete');
+                return;
+              } 
+              // value = decoder.decode(value);
+              if(value.length > 0)
+                renderTable(JSON.parse(value));
+              return reader.read().then(pump);
+            });
+          })
+          if (!resp) throw new Error('请求失败');
+
+        } catch (e) {
+          statusEl.textContent = '状态：抓取失败 - ' + e.message;
+        }
+      };
 
     document.getElementById('exportBtn').onclick = () => {
       window.location.href = '/export';

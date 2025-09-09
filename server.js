@@ -31,6 +31,22 @@ app.post('/search', async (req, res) => {
             await jd.searchJD(page, keyword, results);
             latestResults = results.map(r => ({ site: 'jd', ...r }));
             //   await browser.close();
+            console.log(`✅ 抓取完成：${latestResults.length} 条`);
+            res.json(latestResults);
+        } else if (site === 'jdstream') {
+            const { browser, page } = await jd.launchBrowser();
+            await jd.loginJD(page);
+            await jd.search(page, keyword,async (results)=>{
+                const {event,data} = results;
+                console.log(`返回回调！${event}，条数：`,data.length);
+                latestResults = data.map(r => ({ site: 'jd', ...r }));
+                res.write(JSON.stringify(latestResults) + '\n');
+                if(!event) {
+                    console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                    res.end();
+                }
+            });
+            //   await browser.close();
 
         } else if (site === 'taobao') {
             const { browser, page } = await tb.launchBrowser();
@@ -38,11 +54,12 @@ app.post('/search', async (req, res) => {
             await tb.searchTB(page, keyword, results);
             latestResults = results.map(r => ({ site: 'taobao', ...r }));
             //   await browser.close();
+             console.log(`✅ 抓取完成：${latestResults.length} 条`);
+            res.json(latestResults);
         } else {
             return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         }
-        console.log(`✅ 抓取完成：${latestResults.length} 条`);
-        res.json(latestResults);
+       
     } catch (e) {
         console.error('❌ 抓取失败：', e);
         res.status(500).json({ error: '抓取失败', detail: String(e) });
