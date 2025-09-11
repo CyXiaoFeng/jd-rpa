@@ -46,7 +46,7 @@ async function launchBrowser() {
 }
 
 // 登录淘宝（可选，但强烈建议）
-async function loginTaobao(page) {
+async function login(page) {
     if (fs.existsSync(COOKIES_FILE)) {
         const cookies = JSON.parse(fs.readFileSync(COOKIES_FILE));
         await page.setCookie(...cookies);
@@ -172,49 +172,8 @@ async function getPerResults(page, func) {
     }
 }
 
-async function searchTB(page, keyword, results) {
-    const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
-    await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
-    await page.addScriptTag({ path: "./public.js" });
-    await getResults(page, results);
-    console.log(`✅ 共抓取 ${results.length} 条结果`);
-    // console.table(results);
-
-}
-// 搜索 & 抓取所有页
-async function getResults(page, results) {
-
-    try {
-        const { selector } = await waitForProductContainer(page);
-        await autoScroll(page);
-        const items = await getProductInfo(selector, page);
-        console.log('淘宝本页抓取：', items.length);
-        results.push(...items);
-        // 下一页
-        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
-        if (hasNext && !isDisabled && nextBtn) {
-            console.log('找到下一页按钮，是否禁用:', isDisabled);
-            await Promise.all([
-                nextBtn.click(),
-                // page.waitForNavigation({ waitUntil: 'networkidle2' })
-            ]);
-            console.log('➡️ 已点击下一页');
-            await getResults(page, results);
-
-        } else {
-            console.log('没有找到下一页按钮或已禁用，结束抓取。');
-        }
-
-
-        // return results;
-    } catch (error) {
-        console.error('获取商品信息失败:', error);
-    }
-}
-
 module.exports = {
     search,
-    searchTB,
     launchBrowser,
-    loginTaobao
+    login
 };

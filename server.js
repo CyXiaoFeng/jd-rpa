@@ -44,42 +44,12 @@ app.post('/search', async (req, res) => {
         latestResults = [];
         latestSite = site;
         let results = [];
-        const target = site.startsWith("jd") ? jd : tb;
+        const target = site.startsWith("jd") ? jd : site.startsWith("jd") ? tb : null;
+        if(!target) return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         const { browser, page } = await target.launchBrowser();
         await target.login(page);
         await target.search(page, keyword, streamFunc);
-        await browser.close();
-        return;
-        if (site.startsWith("jd")) {
-            const { browser, page } = await jd.launchBrowser();
-            await jd.loginJD(page);
-            if (site.endsWith("stream")) {
-                await jd.search(page, keyword, streamFunc);
-            } else {
-                await jd.searchJD(page, keyword, results);
-                latestResults = results.map(r => ({ site: 'jd', ...r }));
-                console.log(`✅ 抓取完成：${latestResults.length} 条`);
-                res.json(latestResults);
-            }
-            //   await browser.close();
-
-        } else if (site.startsWith("tb")) {
-            const { browser, page } = await tb.launchBrowser();
-            await tb.loginTaobao(page); // 可根据需要注释掉，但强烈建议登录
-            if (site.endsWith("stream")) {
-                await tb.search(page, keyword, streamFunc);
-            } else {
-                await tb.searchTB(page, keyword, results);
-                latestResults = results.map(r => ({ site: 'taobao', ...r }));
-                console.log(`✅ 抓取完成：${latestResults.length} 条`);
-                res.json(latestResults);
-            }
-            //   await browser.close();
-
-        } else {
-            return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
-        }
-
+        target.browser.close();
     } catch (e) {
         console.error('❌ 抓取失败：', e);
         res.status(500).json({ error: '抓取失败', detail: String(e) });

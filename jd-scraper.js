@@ -125,18 +125,7 @@ async function getProductInfo(selector, page) {
 }
 
 // 搜索关键词
-async function searchJD(page, keyword, results) {
-    console.log(`🔍 搜索: ${keyword}`);
-    await page.type('#key', keyword);
-    await page.evaluate(() => document.querySelector('.button').click());
-    console.log('点击搜索按钮');
-    // console.log('当前页面 frames 数量:', page.frames().length);
-    // page.frames().forEach(f => console.log(f.url(), f.name()));
-    await getResults(page, results);
-    console.log(`✅ 共抓取 ${results.length} 条结果`);
-    // console.table(results);
-    return results;
-}
+
 
 // 搜索关键词
 async function search(page, keyword, func) {
@@ -174,35 +163,8 @@ async function getPerResults(page,func) {
     }
 }
 
-// 递归抓取每一页
-async function getResults(page, results) {
-    try {
-        const { selector } = await waitForProductContainer(page);
-        console.log(`当前使用 selector: ${selector}`);
-        await autoScroll(page);
-        const productInfo = await getProductInfo(selector, page);
-        console.log(`本页抓取 ${productInfo.length} 条`);
-        results.push(...productInfo);
-        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
-        if (hasNext && !isDisabled && nextBtn) {
-            console.log('找到下一页按钮，是否禁用:', isDisabled);
-                await Promise.all([
-                    nextBtn.click(),
-                ]);
-                console.log('➡️ 已点击下一页');
-                await getResults(page, results);
-           
-        } else {
-            console.log('没有找到下一页按钮或已禁用，结束抓取。');
-        }
-    } catch (error) {
-        console.error('获取商品信息失败:', error);
-    }
-}
-
 module.exports = {
     search,
-    searchJD,
     launchBrowser,
     login
 };
