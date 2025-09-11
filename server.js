@@ -43,13 +43,12 @@ app.post('/search', async (req, res) => {
     try {
         latestResults = [];
         latestSite = site;
-        let results = [];
-        const target = site.startsWith("jd") ? jd : site.startsWith("jd") ? tb : null;
+        const target = site.startsWith("jd") ? jd : site.startsWith("tb") ? tb : null;
         if(!target) return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         const { browser, page } = await target.launchBrowser();
         await target.login(page);
         await target.search(page, keyword, streamFunc);
-        target.browser.close();
+        browser.close();
     } catch (e) {
         console.error('❌ 抓取失败：', e);
         res.status(500).json({ error: '抓取失败', detail: String(e) });
