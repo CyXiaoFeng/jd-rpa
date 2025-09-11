@@ -21,45 +21,59 @@ app.post('/search', async (req, res) => {
 
     console.log(`🔍 搜索请求：site=${site} keyword=${keyword}`);
 
+    const streamFunc = async (results) => {
+        const { event, data } = results;
+        console.log(`返回回调！${event}，条数：`, data.length);
+        latestResults = data.map(r => ({ site: 'jd', ...r }));
+        if (latestSite.endsWith("stream")) {
+            res.write(JSON.stringify(latestResults) + '\n');
+            if (!event) {
+                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                res.end();
+            }
+        } else {
+            latestResults.push(...data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r })));
+            if (!event) {
+                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                res.json(latestResults);
+            }
+        }
+    }
+
     try {
         latestResults = [];
         latestSite = site;
         let results = [];
-        if (site === 'jd') {
+        if (site.startsWith("jd")) {
             const { browser, page } = await jd.launchBrowser();
             await jd.loginJD(page);
-            await jd.searchJD(page, keyword, results);
-            latestResults = results.map(r => ({ site: 'jd', ...r }));
-            //   await browser.close();
-            console.log(`✅ 抓取完成：${latestResults.length} 条`);
-            res.json(latestResults);
-        } else if (site === 'jdstream') {
-            const { browser, page } = await jd.launchBrowser();
-            await jd.loginJD(page);
-            await jd.search(page, keyword,async (results)=>{
-                const {event,data} = results;
-                console.log(`返回回调！${event}，条数：`,data.length);
-                latestResults = data.map(r => ({ site: 'jd', ...r }));
-                res.write(JSON.stringify(latestResults) + '\n');
-                if(!event) {
-                    console.log(`✅ 抓取完成：${latestResults.length} 条`);
-                    res.end();
-                }
-            });
+            if (site.endsWith("stream")) {
+                await jd.search(page, keyword, streamFunc);
+            } else {
+                await jd.searchJD(page, keyword, results);
+                latestResults = results.map(r => ({ site: 'jd', ...r }));
+                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                res.json(latestResults);
+            }
             //   await browser.close();
 
-        } else if (site === 'taobao') {
+        } else if (site.startsWith("tb")) {
             const { browser, page } = await tb.launchBrowser();
             await tb.loginTaobao(page); // 可根据需要注释掉，但强烈建议登录
-            await tb.searchTB(page, keyword, results);
-            latestResults = results.map(r => ({ site: 'taobao', ...r }));
+            if (site.endsWith("stream")) {
+                await tb.search(page, keyword, streamFunc);
+            } else {
+                await tb.searchTB(page, keyword, results);
+                latestResults = results.map(r => ({ site: 'taobao', ...r }));
+                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                res.json(latestResults);
+            }
             //   await browser.close();
-             console.log(`✅ 抓取完成：${latestResults.length} 条`);
-            res.json(latestResults);
+
         } else {
             return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         }
-       
+
     } catch (e) {
         console.error('❌ 抓取失败：', e);
         res.status(500).json({ error: '抓取失败', detail: String(e) });

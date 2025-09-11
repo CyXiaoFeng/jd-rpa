@@ -126,7 +126,7 @@ async function getProductInfo(selector, page) {
                 price: getValue(el, '[class*="priceInt"], [class*="priceFloat"]', { type: 'text', def: '未知价格' }),
                 sold: getValue(el, '[class*="realSales"]', { type: 'text', def: '已售0' }),
                 link: getValue(el, 'a[href]', { type: 'attr', attr: 'href', def: '未知链接' }),
-                
+
             }));
         }, selector);
     } catch (error) {
@@ -136,6 +136,41 @@ async function getProductInfo(selector, page) {
 
 }
 
+async function search(page, keyword, func) {
+    const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+    await page.addScriptTag({ path: "./public.js" });
+    console.log('点击搜索按钮，获取数据流');
+    await getPerResults(page, func);
+    // return results;
+}
+
+async function getPerResults(page, func) {
+    try {
+        const { selector } = await waitForProductContainer(page);
+        await autoScroll(page);
+        const items = await getProductInfo(selector, page);
+        console.log('淘宝本页抓取：', items.length);
+        // 下一页
+        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
+        if (hasNext && !isDisabled && nextBtn) {
+            console.log('找到下一页按钮，是否禁用:', isDisabled);
+            await Promise.all([
+                nextBtn.click(),
+                // page.waitForNavigation({ waitUntil: 'networkidle2' })
+            ]);
+            console.log('➡️ 已点击下一页');
+            func({ event: true, data: items })
+            await getPerResults(page, func)
+
+        } else {
+            console.log('没有找到下一页按钮或已禁用，结束抓取。');
+            func({ event: false, data: items })
+        }
+    } catch (error) {
+        console.error('获取商品信息失败:', error);
+    }
+}
 
 async function searchTB(page, keyword, results) {
     const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
@@ -144,34 +179,31 @@ async function searchTB(page, keyword, results) {
     await getResults(page, results);
     console.log(`✅ 共抓取 ${results.length} 条结果`);
     // console.table(results);
-    // return results;
+
 }
 // 搜索 & 抓取所有页
 async function getResults(page, results) {
 
     try {
         const { selector } = await waitForProductContainer(page);
-
         await autoScroll(page);
-
         const items = await getProductInfo(selector, page);
         console.log('淘宝本页抓取：', items.length);
         results.push(...items);
-
         // 下一页
-         const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
-         if (hasNext && !isDisabled && nextBtn) {
-                console.log('找到下一页按钮，是否禁用:', isDisabled);
-                    await Promise.all([
-                        nextBtn.click(),
-                        // page.waitForNavigation({ waitUntil: 'networkidle2' })
-                    ]);
-                    console.log('➡️ 已点击下一页');
-                    await getResults(page, results);
+        const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
+        if (hasNext && !isDisabled && nextBtn) {
+            console.log('找到下一页按钮，是否禁用:', isDisabled);
+            await Promise.all([
+                nextBtn.click(),
+                // page.waitForNavigation({ waitUntil: 'networkidle2' })
+            ]);
+            console.log('➡️ 已点击下一页');
+            await getResults(page, results);
 
-            } else {
-                console.log('没有找到下一页按钮或已禁用，结束抓取。');
-            }
+        } else {
+            console.log('没有找到下一页按钮或已禁用，结束抓取。');
+        }
 
 
         // return results;
@@ -181,6 +213,7 @@ async function getResults(page, results) {
 }
 
 module.exports = {
+    search,
     searchTB,
     launchBrowser,
     loginTaobao

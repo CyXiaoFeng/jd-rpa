@@ -1,19 +1,58 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
   <meta charset="UTF-8" />
   <title>电商抓取工具（JD / 淘宝）</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; max-width: 900px; margin: 40px auto; }
-    .row { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
-    input, select, button { padding: 8px 10px; font-size: 14px; }
-    button { cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #fafafa; }
-    .status { margin-top: 8px; color: #666; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      max-width: 900px;
+      margin: 40px auto;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    input,
+    select,
+    button {
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background: #fafafa;
+    }
+
+    .status {
+      margin-top: 8px;
+      color: #666;
+    }
   </style>
 </head>
+
 <body>
   <h1>电商抓取工具</h1>
 
@@ -22,13 +61,12 @@
     <select id="site">
       <option value="jd">京东</option>
       <option value="jdstream">京东流</option>
-      <option value="taobao">淘宝</option>
-      <option value="taobaostream">淘宝流</option>
+      <option value="tb">淘宝</option>
+      <option value="tbstream">淘宝流</option>
     </select>
 
     <input id="keyword" type="text" placeholder="输入关键词，例如：手机壳 / 叶黄素鸡蛋" style="flex:1" />
     <button id="searchBtn">开始抓取</button>
-    <button id="searchBtnStream">开始抓取流</button>
     <button id="exportBtn">导出 Excel</button>
   </div>
 
@@ -87,54 +125,36 @@
           body: JSON.stringify({ keyword, site })
         });
         if (!resp.ok) throw new Error('请求失败 ' + resp.status);
-        const data = await resp.json();
-        statusEl.textContent = `状态：抓取完成，共 ${data.length} 条`;
-        renderTable(data);
+        if (site.endsWith("stream")) {
+          const reader = resp.body
+            .pipeThrough(new TextDecoderStream())
+            .getReader();
+            reader.read().then(function pump({ done, value }) {
+              console.log(`is done? ${done}`);
+              if (done) {
+                console.log('Stream complete');
+                return;
+              }
+              // value = decoder.decode(value);
+              if (value.length > 0)
+                renderTable(JSON.parse(value));
+              return reader.read().then(pump);
+            });
+        } else {
+          const data = await resp.json();
+          statusEl.textContent = `状态：抓取完成，共 ${data.length} 条`;
+          renderTable(data);
+        }
+
       } catch (e) {
         statusEl.textContent = '状态：抓取失败 - ' + e.message;
       }
     };
-
-    document.getElementById('searchBtnStream').onclick = async () => {
-        const keyword = document.getElementById('keyword').value.trim();
-        const site = document.getElementById('site').value;
-        if (!keyword) return alert('请输入关键词');
-        const decoder = new TextDecoder("utf-8");
-        renderTable([]);
-        statusEl.textContent = '状态：抓取中...（会自动打开浏览器并可能需要登录）';
-
-        try {
-          const resp = await fetch('/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keyword, site })
-          }).then((response) => {
-            const reader = response.body
-            .pipeThrough(new TextDecoderStream())
-            .getReader();
-            // read() returns a promise that resolves when a value has been received
-            reader.read().then(function pump({ done, value }) {
-              console.log(`is done? ${done}`);
-              if(done) {
-                console.log('Stream complete');
-                return;
-              } 
-              // value = decoder.decode(value);
-              if(value.length > 0)
-                renderTable(JSON.parse(value));
-              return reader.read().then(pump);
-            });
-          })
-          if (!resp) throw new Error('请求失败');
-
-        } catch (e) {
-          statusEl.textContent = '状态：抓取失败 - ' + e.message;
-        }
-      };
 
     document.getElementById('exportBtn').onclick = () => {
       window.location.href = '/export';
     };
   </script>
 </body>
+
 </html>
