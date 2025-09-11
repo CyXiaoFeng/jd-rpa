@@ -44,6 +44,12 @@ app.post('/search', async (req, res) => {
         latestResults = [];
         latestSite = site;
         let results = [];
+        const target = site.startsWith("jd") ? jd : tb;
+        const { browser, page } = await target.launchBrowser();
+        await target.login(page);
+        await target.search(page, keyword, streamFunc);
+        await browser.close();
+        return;
         if (site.startsWith("jd")) {
             const { browser, page } = await jd.launchBrowser();
             await jd.loginJD(page);

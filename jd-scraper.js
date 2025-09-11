@@ -48,7 +48,7 @@ async function launchBrowser() {
 }
 
 // 登录京东
-async function loginJD(page) {
+async function login(page) {
     if (fs.existsSync(COOKIES_FILE)) {
         const cookies = JSON.parse(fs.readFileSync(COOKIES_FILE));
         await page.setCookie(...cookies);
@@ -204,5 +204,5 @@ module.exports = {
     search,
     searchJD,
     launchBrowser,
-    loginJD
+    login
 };
