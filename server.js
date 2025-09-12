@@ -18,13 +18,14 @@ app.post('/search', async (req, res) => {
     const { keyword, site } = req.body || {};
     if (!keyword) return res.status(400).json({ error: '缺少 keyword' });
     if (!site) return res.status(400).json({ error: '缺少 site（jd|taobao）' });
-
+    const target = site.startsWith("jd") ? jd : site.startsWith("tb") ? tb : null;
+    if (!target) return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
     console.log(`🔍 搜索请求：site=${site} keyword=${keyword}`);
 
     const streamFunc = async (results) => {
         const { event, data } = results;
         console.log(`返回回调！${event}，条数：`, data.length);
-        latestResults = data.map(r => ({ site: 'jd', ...r }));
+        latestResults = data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r }));
         if (latestSite.endsWith("stream")) {
             res.write(JSON.stringify(latestResults) + '\n');
             if (!event) {
@@ -43,8 +44,6 @@ app.post('/search', async (req, res) => {
     try {
         latestResults = [];
         latestSite = site;
-        const target = site.startsWith("jd") ? jd : site.startsWith("tb") ? tb : null;
-        if(!target) return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
         const { browser, page } = await target.launchBrowser();
         await target.login(page);
         await target.search(page, keyword, streamFunc);

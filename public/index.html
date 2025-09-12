@@ -135,7 +135,6 @@
                 console.log('Stream complete');
                 return;
               }
-              // value = decoder.decode(value);
               if (value.length > 0)
                 renderTable(JSON.parse(value));
               return reader.read().then(pump);
