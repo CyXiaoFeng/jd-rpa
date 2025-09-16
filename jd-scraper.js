@@ -6,7 +6,7 @@ const fs = require('fs');
 puppeteer.use(StealthPlugin());
 
 const COOKIES_FILE = 'jd_cookies.json';
-
+const IS_LOGIN_SELECTORS = '[id^="ttbar-login"] .nickname'
 // 商品容器选择器
 const PRODUCT_CONTAINER_SELECTORS = [
     '#J_goodsList > ul',
@@ -57,12 +57,12 @@ async function login(page) {
 
     await page.goto('https://www.jd.com', { waitUntil: 'networkidle2' });
 
-    const isLoggedIn = await page.evaluate(() => !!document.querySelector('[id^="ttbar-login"] .nickname'));
+    const isLoggedIn = await page.evaluate(() => !!document.querySelector(IS_LOGIN_SELECTORS));
 
     if (!isLoggedIn) {
         console.log("请手动扫码登录...");
         await page.waitForFunction(
-            () => !!document.querySelector('[id^="ttbar-login"] .nickname'),
+            () => !!document.querySelector(IS_LOGIN_SELECTORS),
             { timeout: 0 }
         );
         console.log("登录成功，保存 Cookie...");
