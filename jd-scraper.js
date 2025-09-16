@@ -57,12 +57,12 @@ async function login(page) {
 
     await page.goto('https://www.jd.com', { waitUntil: 'networkidle2' });
 
-    const isLoggedIn = await page.evaluate(() => !!document.querySelector('#ttbar-login .nickname'));
+    const isLoggedIn = await page.evaluate(() => !!document.querySelector('[id^="ttbar-login"] .nickname'));
 
     if (!isLoggedIn) {
         console.log("请手动扫码登录...");
         await page.waitForFunction(
-            () => !!document.querySelector('#ttbar-login .nickname'),
+            () => !!document.querySelector('[id^="ttbar-login"] .nickname'),
             { timeout: 0 }
         );
         console.log("登录成功，保存 Cookie...");
@@ -123,10 +123,6 @@ async function getProductInfo(selector, page) {
         return [];
     }
 }
-
-// 搜索关键词
-
-
 // 搜索关键词
 async function search(page, keyword, func) {
     console.log(`🔍 搜索: ${keyword}`);
