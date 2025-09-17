@@ -33,7 +33,6 @@ app.post('/search', async (req, res) => {
                 res.end();
             }
         } else {
-            latestResults.push(...data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r })));
             if (!event) {
                 console.log(`✅ 抓取完成：${latestResults.length} 条`);
                 res.json(latestResults);

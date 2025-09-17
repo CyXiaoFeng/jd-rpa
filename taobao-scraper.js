@@ -55,13 +55,14 @@ async function login(page) {
 
     // 访问淘宝首页或搜索页，触发登录态检查
     await page.goto('https://www.taobao.com', { waitUntil: 'domcontentloaded' });
+    const IS_LOGIN_SELECTORS = '.site-nav-login-info-nick, .site-nav-sign a[href*="login"]';
 
     // 粗略判断登录：顶部“亲，请登录”
-    const needLogin = await page.evaluate(() => {
-        const el = document.querySelector('.site-nav-login-info-nick, .site-nav-sign a[href*="login"]');
+    const needLogin = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
         // el 可能是“请登录”链接；如果找不到登录提示，视为可能已登录
         return !!(el && /登录/i.test(el.innerText || ''));
-    });
+    }, IS_LOGIN_SELECTORS);
 
     if (needLogin) {
         console.log('请进行淘宝登录（二维码或账号密码），登录完成页面会有个人信息。');
@@ -121,7 +122,7 @@ async function getProductInfo(selector, page) {
             // 判断是 ul 还是 div 容器
             const items = sel === '#J_goodsList > ul' ? container.querySelectorAll('li') : container.children;
             return Array.from(items).map(el => ({
-                shop: getValue(el, '[class*="shop"]', { type: 'text', def: '未知店铺' }),
+                shop: getValue(el, 'span[class*="shopNameText"]', { type: 'text', def: '未知店铺' }),
                 product: getValue(el, '[class*="title"]', { type: 'text', def: '未知商品' }),
                 price: getValue(el, '[class*="priceInt"], [class*="priceFloat"]', { type: 'text', def: '未知价格' }),
                 sold: getValue(el, '[class*="realSales"]', { type: 'text', def: '已售0' }),
