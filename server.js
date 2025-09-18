@@ -25,14 +25,16 @@ app.post('/search', async (req, res) => {
     const streamFunc = async (results) => {
         const { event, data } = results;
         console.log(`返回回调！${event}，条数：`, data.length);
-        latestResults = data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r }));
+        const result = data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r }))
         if (latestSite.endsWith("stream")) {
+            latestResults = result;
             res.write(JSON.stringify(latestResults) + '\n');
             if (!event) {
                 console.log(`✅ 抓取完成：${latestResults.length} 条`);
                 res.end();
             }
         } else {
+            latestResults.push(...result);
             if (!event) {
                 console.log(`✅ 抓取完成：${latestResults.length} 条`);
                 res.json(latestResults);

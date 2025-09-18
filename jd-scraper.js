@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const checkNextButton = require('./public').checkNextButton;
+const getMustMatchKey = require('./public').getMustMatchKey;
 const fs = require('fs');
 
 puppeteer.use(StealthPlugin());
@@ -15,6 +16,7 @@ const PRODUCT_CONTAINER_SELECTORS = [
 // 翻页按钮选择器
 const NEXT_PAGE_SELECTORS = '#searchCenter [class*="pagination_next"], #searchCenter .pn-next';
 
+let MUST_MATCH = undefined
 // 等待商品容器出现
 async function waitForProductContainer(page) {
     for (const sel of PRODUCT_CONTAINER_SELECTORS) {
@@ -100,25 +102,33 @@ async function autoScroll(page) {
 }
 
 // 获取商品信息
-async function getProductInfo(selector, page) {
+async function getProductInfo(selector, page, mustKeywords) {
     try {
-         const hasFunc = await page.evaluate(() => typeof getValue === 'function');
-         if(!hasFunc)
-            await page.addScriptTag({path: "public.js"});
-        return await page.evaluate((sel) => {
-            console.log('当前 evaluate 执行在 frame:', window.location.href);
+        const hasFunc = await page.evaluate(() => typeof getValue === 'function');
+        console.log('关键字:', mustKeywords);
+        if (!hasFunc)
+            await page.addScriptTag({ path: "public.js" });
+         return await page.evaluate((sel, mustKeywords) => {
             const container = document.querySelector(sel);
             if (!container) return [];
+            
             // 判断是 ul 还是 div 容器
             const items = sel === '#J_goodsList > ul' ? container.querySelectorAll('li') : container.children;
-            return Array.from(items).map(el => ({
-                shop: getValue(el, '[class*="shop"]', { type: 'text', def: '未知店铺' }),
-                product: getValue(el, '[class*="name"], div._goods_title_container_1x4i2_1 span',  { type: 'text', def: '未知商品' }),
-                price: getValue(el, '[class*="price"], div._container_1tn4o_1 span', { type: 'text', def: '未知价格' }),
-                sold: getValue(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', { type: 'text', def: '已售0' }),
-                link: getValue(el, 'a[href*="//item.jd.com"]', { type: 'attr', attr: 'href', def: '未知链接' }),
-            }));
-        }, selector);
+            return Array.from(items)
+                .map(el => ({
+                    shop: getValue(el, '[class*="shop"]', { type: 'text', def: '未知店铺' }),
+                    product: getValue(el, '[class*="name"], div._goods_title_container_1x4i2_1 span', { type: 'text', def: '未知商品' }),
+                    price: getValue(el, '[class*="price"], div._container_1tn4o_1 span', { type: 'text', def: '未知价格' }),
+                    sold: getValue(el, '[class*="commit"], div._goods_volume_container_1xkku_1 span span:nth-child(1)', { type: 'text', def: '已售0' }),
+                    link: getValue(el, 'a[href*="//item.jd.com"]', { type: 'attr', attr: 'href', def: '未知链接' }),
+                }))
+                .filter(item => {
+                    // 如果传了关键字 → 去掉不包含关键字的行
+                    if (mustKeywords &&mustKeywords.length === 0) return true;
+                    const text = item.product;
+                    return mustKeywords.every(k => text.includes(k));
+                });
+        }, selector, mustKeywords);
     } catch (error) {
         console.error('获取商品信息失败:', error);
         return [];
@@ -127,18 +137,19 @@ async function getProductInfo(selector, page) {
 // 搜索关键词
 async function search(page, keyword, func) {
     console.log(`🔍 搜索: ${keyword}`);
-    await page.type('#key', keyword);
+    const {mustKeywords,searchKeyword} = await getMustMatchKey(keyword)
+    await page.type('#key', searchKeyword);
     await page.evaluate(() => document.querySelector('.button').click());
     console.log('点击搜索按钮，获取数据流');
-    await getPerResults(page,func);
+    await getPerResults(page,func, mustKeywords);
 }
 
-async function getPerResults(page,func) {
+async function getPerResults(page,func, mustKeywords) {
     try {
         const { selector } = await waitForProductContainer(page);
         console.log(`当前使用 selector: ${selector}`);
         await autoScroll(page);
-        const productInfo = await getProductInfo(selector, page);
+        const productInfo = await getProductInfo(selector, page, mustKeywords);
         console.log(`本页抓取 ${productInfo.length} 条`);
         const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
         if (hasNext && !isDisabled && nextBtn) {
@@ -148,7 +159,7 @@ async function getPerResults(page,func) {
                 ]);
                 console.log('➡️ 已点击下一页');
                 func({event:true,data:productInfo})
-                await getPerResults(page,func)
+                await getPerResults(page,func, mustKeywords)
            
         } else {
             console.log('没有找到下一页按钮或已禁用，结束抓取。');

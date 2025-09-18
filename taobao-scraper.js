@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const checkNextButton = require('./public').checkNextButton;
+const getMustMatchKey = require('./public').getMustMatchKey;
 const fs = require('fs');
 puppeteer.use(StealthPlugin());
 
@@ -116,7 +117,7 @@ async function waitForProductContainer(page) {
 // 抓取本页商品
 async function getProductInfo(selector, page) {
     try {
-        return await page.evaluate((sel) => {
+        return await page.evaluate((sel, mustKeywords) => {
             const container = document.querySelector(sel);
             if (!container) return [];
             // 判断是 ul 还是 div 容器
@@ -128,8 +129,13 @@ async function getProductInfo(selector, page) {
                 sold: getValue(el, '[class*="realSales"]', { type: 'text', def: '已售0' }),
                 link: getValue(el, 'a[href]', { type: 'attr', attr: 'href', def: '未知链接' }),
 
-            }));
-        }, selector);
+            })).filter(item => {
+                // 如果传了关键字 → 去掉不包含关键字的行
+                if (mustKeywords && mustKeywords.length === 0) return true;
+                const text = item.product;
+                return mustKeywords.every(k => text.includes(k));
+            });
+        }, selector, mustKeywords);
     } catch (error) {
         console.error('获取商品信息失败:', error);
         return [];
@@ -138,19 +144,21 @@ async function getProductInfo(selector, page) {
 }
 
 async function search(page, keyword, func) {
+    console.log(`🔍 搜索: ${keyword}`);
+    const { mustKeywords, searchKeyword } = await getMustMatchKey(searchKeyword)
     const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
     await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ path: "./public.js" });
     console.log('点击搜索按钮，获取数据流');
-    await getPerResults(page, func);
+    await getPerResults(page, func, mustKeywords);
     // return results;
 }
 
-async function getPerResults(page, func) {
+async function getPerResults(page, func, mustKeywords) {
     try {
         const { selector } = await waitForProductContainer(page);
         await autoScroll(page);
-        const items = await getProductInfo(selector, page);
+        const items = await getProductInfo(selector, page, mustKeywords);
         console.log('淘宝本页抓取：', items.length);
         // 下一页
         const { hasNext, isDisabled, element: nextBtn } = await checkNextButton(page, NEXT_PAGE_SELECTORS);
@@ -162,7 +170,7 @@ async function getPerResults(page, func) {
             ]);
             console.log('➡️ 已点击下一页');
             func({ event: true, data: items })
-            await getPerResults(page, func)
+            await getPerResults(page, func, mustKeywords)
 
         } else {
             console.log('没有找到下一页按钮或已禁用，结束抓取。');

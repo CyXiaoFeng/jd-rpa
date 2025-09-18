@@ -33,7 +33,17 @@ async function checkNextButton(page, selector) {
         element: nextBtn
     };
 };
+
+async function getMustMatchKey(keyword) {
+    const matches = keyword.match(/\[(.*?)\]/g) || [];
+    mustKeywords = matches.map(s => s.replace(/[\[\]]/g, '').trim());
+    // 搜索关键词 = 去掉所有方括号
+    searchKeyword = keyword.replace(/[\[\]]/g, '');
+    return {mustKeywords,searchKeyword}
+}
+
 module.exports = {
     getValue,
-    checkNextButton
+    checkNextButton,
+    getMustMatchKey
 };
