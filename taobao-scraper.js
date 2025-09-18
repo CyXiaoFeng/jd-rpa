@@ -115,8 +115,9 @@ async function waitForProductContainer(page) {
 }
 
 // 抓取本页商品
-async function getProductInfo(selector, page) {
+async function getProductInfo(selector, page, mustKeywords) {
     try {
+        console.log('关键字:', mustKeywords);
         return await page.evaluate((sel, mustKeywords) => {
             const container = document.querySelector(sel);
             if (!container) return [];
@@ -145,7 +146,7 @@ async function getProductInfo(selector, page) {
 
 async function search(page, keyword, func) {
     console.log(`🔍 搜索: ${keyword}`);
-    const { mustKeywords, searchKeyword } = await getMustMatchKey(searchKeyword)
+    const { mustKeywords, searchKeyword } = await getMustMatchKey(keyword)
     const searchUrl = 'https://s.taobao.com/search?q=' + encodeURIComponent(keyword);
     await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ path: "./public.js" });

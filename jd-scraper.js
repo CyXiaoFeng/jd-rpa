@@ -124,7 +124,7 @@ async function getProductInfo(selector, page, mustKeywords) {
                 }))
                 .filter(item => {
                     // 如果传了关键字 → 去掉不包含关键字的行
-                    if (mustKeywords &&mustKeywords.length === 0) return true;
+                    if (mustKeywords && mustKeywords.length === 0) return true;
                     const text = item.product;
                     return mustKeywords.every(k => text.includes(k));
                 });

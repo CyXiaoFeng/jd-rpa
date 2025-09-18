@@ -27,16 +27,15 @@ app.post('/search', async (req, res) => {
         console.log(`返回回调！${event}，条数：`, data.length);
         const result = data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r }))
         if (latestSite.endsWith("stream")) {
-            latestResults = result;
-            res.write(JSON.stringify(latestResults) + '\n');
+            res.write(JSON.stringify(result) + '\n');
             if (!event) {
-                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                console.log(`✅ 流数据抓取完成：${result.length} 条`);
                 res.end();
             }
         } else {
             latestResults.push(...result);
             if (!event) {
-                console.log(`✅ 抓取完成：${latestResults.length} 条`);
+                console.log(`✅ 总数据抓取完成：${latestResults.length} 条`);
                 res.json(latestResults);
             }
         }
