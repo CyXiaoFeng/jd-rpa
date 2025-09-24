@@ -14,48 +14,102 @@ app.use(express.static(path.join(__dirname, 'public')));
 let latestResults = [];
 let latestSite = '';
 
+// 存储每个站点的最新结果
+// let siteResults = {}; // Removed duplicate declaration
+
+// 搜索实例类
+class SearchInstance {
+    constructor(keyword, site, res) {
+        this.keyword = keyword;
+        this.site = site;
+        this.res = res;
+        this.results = [];
+        this.finished = false;
+    }
+
+    async run() {
+        const target = this.site.startsWith("jd") ? jd : this.site.startsWith("tb") ? tb : null;
+        if (!target) {
+            this.res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
+            return;
+        }
+        console.log(`🔍 搜索请求：site=${this.site} keyword=${this.keyword}`);
+
+        const streamFunc = async (results) => {
+            const { event, data } = results;
+            const result = data.map(r => ({ site: this.site.startsWith("jd") ? 'jd' : 'tb', ...r }));
+            if (this.site.endsWith("stream")) {
+                this.res.write(JSON.stringify(result) + '\n');
+                if (!event) {
+                    this.finished = true;
+                    latestResults = this.results;
+                    latestSite = this.site;
+                    this.res.end();
+                }
+            } else {
+                this.results.push(...result);
+                if (!event) {
+                    this.finished = true;
+                    latestResults = this.results;
+                    latestSite = this.site;
+                    this.res.json(this.results);
+                }
+            }
+        };
+
+        try {
+            const { browser, page } = await target.launchBrowser();
+            await target.login(page);
+            await target.search(page, this.keyword, streamFunc);
+            browser.close();
+        } catch (e) {
+            console.error('❌ 抓取失败：', e);
+            this.res.status(500).json({ error: '抓取失败', detail: String(e) });
+        }
+    }
+}
+
+// 存储所有搜索实例，key为site，保证每个site只有一个活跃实例
+const searchInstances = {};
+
+// 存储每个站点的最新结果
+let siteResults = {};
+
 app.post('/search', async (req, res) => {
     const { keyword, site } = req.body || {};
     if (!keyword) return res.status(400).json({ error: '缺少 keyword' });
     if (!site) return res.status(400).json({ error: '缺少 site（jd|taobao）' });
-    const target = site.startsWith("jd") ? jd : site.startsWith("tb") ? tb : null;
-    if (!target) return res.status(400).json({ error: 'site 只支持 jd 或 taobao' });
-    console.log(`🔍 搜索请求：site=${site} keyword=${keyword}`);
 
-    const streamFunc = async (results) => {
-        const { event, data } = results;
-        console.log(`返回回调！${event}，条数：`, data.length);
-        const result = data.map(r => ({ site: latestSite.startsWith("jd") ? 'jd' : 'tb', ...r }))
-        if (latestSite.endsWith("stream")) {
-            res.write(JSON.stringify(result) + '\n');
-            if (!event) {
-                console.log(`✅ 流数据抓取完成：${result.length} 条`);
-                res.end();
-            }
-        } else {
-            latestResults.push(...result);
-            if (!event) {
-                console.log(`✅ 总数据抓取完成：${latestResults.length} 条`);
-                res.json(latestResults);
-            }
+    // 每个site只允许一个活跃实例，若有则先结束旧实例
+    if (searchInstances[site]) {
+        try { searchInstances[site].res.end(); } catch {}
+        delete searchInstances[site];
+    }
+
+    // 创建并存储以site为key的实例
+    const instance = new SearchInstance(keyword, site, res);
+    searchInstances[site] = instance;
+
+    instance.run().finally(() => {
+        if (instance.finished) {
+            siteResults[site] = instance.results;
         }
-    }
-
-    try {
-        latestResults = [];
-        latestSite = site;
-        const { browser, page } = await target.launchBrowser();
-        await target.login(page);
-        await target.search(page, keyword, streamFunc);
-        browser.close();
-    } catch (e) {
-        console.error('❌ 抓取失败：', e);
-        res.status(500).json({ error: '抓取失败', detail: String(e) });
-    }
+        delete searchInstances[site];
+    });
 });
 
 app.get('/export', async (req, res) => {
-    if (!latestResults.length) return res.status(400).send('没有数据可导出');
+    // 通过 ?site=jd 或 ?site=taobao 导出对应站点数据
+    const site = req.query.site || latestSite;
+
+    // 检查该 site 是否有活跃实例在执行
+    if (searchInstances[site]) {
+        return res.status(400).send('当前站点数据正在抓取中，暂不能导出');
+    }
+
+    const results = siteResults[site] || [];
+
+    if (!results.length) return res.status(400).send('没有数据可导出');
 
     try {
         const workbook = new ExcelJS.Workbook();
@@ -70,9 +124,9 @@ app.get('/export', async (req, res) => {
             { header: '链接', key: 'link', width: 50 }
         ];
 
-        latestResults.forEach(r => sheet.addRow(r));
+        results.forEach(r => sheet.addRow(r));
 
-        const filename = `results_${latestSite || 'mix'}.xlsx`;
+        const filename = `results_${site || 'mix'}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
         await workbook.xlsx.write(res);
