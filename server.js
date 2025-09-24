@@ -75,10 +75,19 @@ const searchInstances = {};
 // 存储每个站点的最新结果
 let siteResults = {};
 
+// 记录已搜索过的 site
+let searchedSites = [];
+
+// 搜索接口
 app.post('/search', async (req, res) => {
     const { keyword, site } = req.body || {};
     if (!keyword) return res.status(400).json({ error: '缺少 keyword' });
     if (!site) return res.status(400).json({ error: '缺少 site（jd|taobao）' });
+
+    // 记录 site
+    if (!searchedSites.includes(site)) {
+        searchedSites.push(site);
+    }
 
     // 每个site只允许一个活跃实例，若有则先结束旧实例
     if (searchInstances[site]) {
@@ -96,6 +105,54 @@ app.post('/search', async (req, res) => {
         }
         delete searchInstances[site];
     });
+});
+
+// 导出接口增强：支持合并导出多个 site
+app.get('/export', async (req, res) => {
+    // 支持 ?site=jd 或 ?site=taobao 或不传（导出所有已搜索过的 site）
+    let sites = [];
+    const querySite = req.query.site;
+    if (!querySite || querySite === 'all') {
+        sites = [...searchedSites];
+    } else {
+        sites = [querySite];
+    }
+    // const sites = [...searchedSites];
+    if (!sites.length) return res.status(400).send('没有可导出的站点');
+    // 检查获取已完成的 site
+    const finishedSites = sites.filter(site => !searchInstances[site] && siteResults[site] && siteResults[site].length);
+    if (!finishedSites.length) {
+        return res.status(400).send('没有已完成的站点可导出');
+    }
+    // 合并所有已完成 site 的数据
+    const results = finishedSites.flatMap(site => siteResults[site]);
+
+    if (!results.length) return res.status(400).send('没有数据可导出');
+
+    try {
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('结果');
+
+        sheet.columns = [
+            { header: '站点', key: 'site', width: 10 },
+            { header: '店铺', key: 'shop', width: 30 },
+            { header: '商品', key: 'product', width: 60 },
+            { header: '价格', key: 'price', width: 14 },
+            { header: '销量', key: 'sold', width: 14 },
+            { header: '链接', key: 'link', width: 50 }
+        ];
+
+        results.forEach(r => sheet.addRow(r));
+
+        const filename = `results_${sites.join('_')}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (e) {
+        console.error('导出失败：', e);
+        res.status(500).send('导出失败');
+    }
 });
 
 app.get('/export', async (req, res) => {

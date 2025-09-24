@@ -67,7 +67,8 @@
 
     <input id="keyword" type="text" placeholder="输入关键词，例如：手机壳 / 叶黄素鸡蛋" style="flex:1" />
     <button id="searchBtn">开始抓取</button>
-    <button id="exportBtn">导出 Excel</button>
+    <button id="exportBtn" value="1">导出当前站点 Excel</button>
+    <button id="exportBtn" value="0">导出所有站点 Excel</button>
   </div>
 
   <div class="status" id="status">状态：就绪</div>
@@ -150,9 +151,17 @@
       }
     };
 
-    document.getElementById('exportBtn').onclick = () => {
-      window.location.href = '/export';
-    };
+    document.querySelectorAll('#exportBtn').forEach(btn => {
+      btn.onclick = () => {
+      const value = btn.value;
+      let url = '/export';
+      if (value === "1") {
+        const site = document.getElementById('site').value;
+        url += `?site=${encodeURIComponent(site)}`;
+      }
+      window.location.href = url;
+      };
+    });
   </script>
 </body>
 
