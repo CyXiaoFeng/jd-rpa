@@ -11,12 +11,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let latestResults = [];
-let latestSite = '';
-
-// 存储每个站点的最新结果
-// let siteResults = {}; // Removed duplicate declaration
-
 // 搜索实例类
 class SearchInstance {
     constructor(keyword, site, res) {
@@ -42,16 +36,12 @@ class SearchInstance {
                 this.res.write(JSON.stringify(result) + '\n');
                 if (!event) {
                     this.finished = true;
-                    latestResults = this.results;
-                    latestSite = this.site;
                     this.res.end();
                 }
             } else {
                 this.results.push(...result);
                 if (!event) {
                     this.finished = true;
-                    latestResults = this.results;
-                    latestSite = this.site;
                     this.res.json(this.results);
                 }
             }
@@ -61,7 +51,7 @@ class SearchInstance {
             const { browser, page } = await target.launchBrowser();
             await target.login(page);
             await target.search(page, this.keyword, streamFunc);
-            browser.close();
+            await browser.close();
         } catch (e) {
             console.error('❌ 抓取失败：', e);
             this.res.status(500).json({ error: '抓取失败', detail: String(e) });
@@ -91,7 +81,8 @@ app.post('/search', async (req, res) => {
 
     // 每个site只允许一个活跃实例，若有则先结束旧实例
     if (searchInstances[site]) {
-        try { searchInstances[site].res.end(); } catch {}
+        // 结束上一个响应，确保每个站点只有一个活跃实例，避免响应冲突
+        try { searchInstances[site].res.end(); } catch { }
         delete searchInstances[site];
     }
 
@@ -117,7 +108,6 @@ app.get('/export', async (req, res) => {
     } else {
         sites = [querySite];
     }
-    // const sites = [...searchedSites];
     if (!sites.length) return res.status(400).send('没有可导出的站点');
     // 检查获取已完成的 site
     const finishedSites = sites.filter(site => !searchInstances[site] && siteResults[site] && siteResults[site].length);
@@ -145,45 +135,6 @@ app.get('/export', async (req, res) => {
         results.forEach(r => sheet.addRow(r));
 
         const filename = `results_${sites.join('_')}.xlsx`;
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-        await workbook.xlsx.write(res);
-        res.end();
-    } catch (e) {
-        console.error('导出失败：', e);
-        res.status(500).send('导出失败');
-    }
-});
-
-app.get('/export', async (req, res) => {
-    // 通过 ?site=jd 或 ?site=taobao 导出对应站点数据
-    const site = req.query.site || latestSite;
-
-    // 检查该 site 是否有活跃实例在执行
-    if (searchInstances[site]) {
-        return res.status(400).send('当前站点数据正在抓取中，暂不能导出');
-    }
-
-    const results = siteResults[site] || [];
-
-    if (!results.length) return res.status(400).send('没有数据可导出');
-
-    try {
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet('结果');
-
-        sheet.columns = [
-            { header: '站点', key: 'site', width: 10 },
-            { header: '店铺', key: 'shop', width: 30 },
-            { header: '商品', key: 'product', width: 60 },
-            { header: '价格', key: 'price', width: 14 },
-            { header: '销量', key: 'sold', width: 14 },
-            { header: '链接', key: 'link', width: 50 }
-        ];
-
-        results.forEach(r => sheet.addRow(r));
-
-        const filename = `results_${site || 'mix'}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
         await workbook.xlsx.write(res);

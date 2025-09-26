@@ -127,19 +127,27 @@
         });
         if (!resp.ok) throw new Error('请求失败 ' + resp.status);
         if (site.endsWith("stream")) {
+          statusEl.textContent = '状态：正在接收数据流...';
+          let allResults = [];
           const reader = resp.body
             .pipeThrough(new TextDecoderStream())
             .getReader();
-            reader.read().then(function pump({ done, value }) {
-              console.log(`is done? ${done}`);
-              if (done) {
-                console.log('Stream complete');
-                return;
-              }
-              if (value.length > 0)
-                renderTable(JSON.parse(value));
-              return reader.read().then(pump);
-            });
+
+          function processStream({ done, value }) {
+            if (done) {
+              statusEl.textContent = `状态：抓取完成，共 ${allResults.length} 条`;
+              return;
+            }
+            // Process potentially multiple JSON objects in one chunk
+            const chunks = value.split('\n').filter(Boolean);
+            for (const chunk of chunks) {
+              const data = JSON.parse(chunk);
+              allResults.push(...data);
+            }
+            renderTable(allResults);
+            return reader.read().then(processStream);
+          }
+          reader.read().then(processStream);
         } else {
           const data = await resp.json();
           statusEl.textContent = `状态：抓取完成，共 ${data.length} 条`;
